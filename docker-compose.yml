@@ -1,16 +1,8 @@
-version: "3.0"
-
 networks:
   proxy:
-    external: true
   jellyfin_default:
-    external: true
   starr:
-    external: true
   jellystat:
-    external: true
-  gluetun_network:
-    external: true
       
 services:
   # REVERSE PROXY IS IN OTHER DOCKER COMPOSE STACK
@@ -51,10 +43,8 @@ services:
     ports:
       - 7878:7878
     networks:
-      proxy:
-      starr:
-      gluetun_network:
-        ipv4_address: ${RADARR_IPV4}
+      - proxy
+      - starr
     restart: unless-stopped
     
   #Sonarr - used to find shows automatically
@@ -71,10 +61,8 @@ services:
     ports:
       - 8989:8989
     networks:
-      proxy:
-      starr:
-      gluetun_network:
-        ipv4_address: ${SONARR_IPV4}
+      - proxy
+      - starr
     restart: unless-stopped
   
   #Readarr - Used to download books
@@ -117,7 +105,6 @@ services:
   kapowarr:
     image: 'mrcas/kapowarr:latest'
     container_name: kapowarr
-    network_mode: "service:gluetun"
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
@@ -126,19 +113,28 @@ services:
       - ${BASE_PATH}/kapowarr/config:/app/db
       - ${MEDIA_SHARE}/temp_downloads:/app/temp_downloads
       - ${MEDIA_SHARE}:/data
+    ports:
+      - 5757:5757
+    networks:
+      - proxy
+      - starr
     restart: unless-stopped
     
   #Prowlarr - manages your Sonarr, Radarr and download client
   prowlarr:
     image: lscr.io/linuxserver/prowlarr:latest
     container_name: prowlarr
-    network_mode: "service:gluetun"
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
     volumes:
       - ${BASE_PATH}/prowlarr/config:/config
+    ports:
+      - 9696:9696
+    networks:
+      - proxy
+      - starr
     restart: unless-stopped
     
   #Autobrr - used to grab torrents using the trackers IRC channel - Increases seeding due to grabbing content before RSS feed
@@ -146,13 +142,17 @@ services:
     container_name: autobrr
     image: ghcr.io/autobrr/autobrr:latest
     restart: unless-stopped
-    network_mode: "service:gluetun"
     environment:
       - TZ=${TZ}
       - PUID=${PUID}
       - PGID=${PGID}
     volumes:
       - ${BASE_PATH}/autobrr/config:/config
+    ports:
+      - 7474:7474
+    networks:
+      - proxy
+      - starr
 
   #seerr - allows users to request media on their own
   seerr:
@@ -184,7 +184,6 @@ services:
     # DockerHub mirror flaresolverr/flaresolverr:latest
     image: alexfozor/flaresolverr:pr-1300-experimental
     container_name: flaresolverr
-    network_mode: "service:gluetun"
     environment:
       - LOG_LEVEL=info
       - LOG_HTML=false
@@ -192,6 +191,10 @@ services:
       - TZ=${TZ}
       - LANG=en_GB
       - DRIVER=nodriver
+    ports:
+      - 8191:8191
+    networks:
+      - starr
     restart: unless-stopped
       
   #Qbittorent - torrenting software
@@ -200,7 +203,6 @@ services:
   qbittorrent:
     image: lscr.io/linuxserver/qbittorrent:libtorrentv1
     container_name: qbittorrent
-    network_mode: "service:gluetun"
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
@@ -211,6 +213,12 @@ services:
     volumes:
       - ${BASE_PATH}/qbittorent/config:/config
       - ${MEDIA_SHARE}:/data
+    ports:
+      - 8080:8080
+      - 8694:8694
+    networks:
+      - proxy
+      - starr
     restart: unless-stopped
 
   #Tdarr - to transcode videos from one format to another like x265 or H.265
@@ -251,7 +259,6 @@ services:
     container_name: bazarr
     image: lscr.io/linuxserver/bazarr:latest
     restart: unless-stopped
-    network_mode: "service:gluetun"
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
@@ -259,6 +266,11 @@ services:
     volumes:
       - ${BASE_PATH}/bazarr/config:/config
       - ${MEDIA_SHARE}:/data
+    ports:
+      - 6767:6767
+    networks:
+      - proxy
+      - starr
       
   #Cross Seed - used to take torrents from one tracker and seed them on another without leeching first. Increases ratio
   #
@@ -266,7 +278,6 @@ services:
   cross-seed:
     image: ghcr.io/cross-seed/cross-seed:latest
     container_name: cross-seed
-    network_mode: "service:gluetun"
     user: ${PUID}:${PGID}
     restart: unless-stopped
     environment:
@@ -278,6 +289,10 @@ services:
       - ${MEDIA_SHARE}/torrents/cross-seed:/data/cross-seeds
       # - ${MEDIA_SHARE}/cross-seed/current-cross-seeds:/data/cross-seeds # A place to temp save current cross seed .torrent files
       #- ${MEDIA_SHARE}/downloads:/data # OPTIONAL!!! this is dataDir path (for data-based matching) - will need to replicate your torrent client's container path (like Arr's do)
+    ports:
+      - 2468:2468
+    networks:
+      - starr
     command: daemon # this enables the search mode, change to daemon to specifically run the daemon
     
   #Wizarr - Allows you to create a share link that you can send to users to invite them to your media server
@@ -348,7 +363,6 @@ services:
   dispatcharr:
     image: ghcr.io/dispatcharr/dispatcharr:latest
     container_name: dispatcharr
-    network_mode: "service:gluetun"
     volumes:
       - ${BASE_PATH}/dispatcharr/data:/data
     environment:
@@ -356,6 +370,11 @@ services:
       - REDIS_HOST=localhost
       - CELERY_BROKER_URL=redis://localhost:6379/0
       - DISPATCHARR_LOG_LEVEL=info
+    ports:
+      - 9191:9191
+    networks:
+      - proxy
+      - starr
     # Optional for hardware acceleration
     devices:
       - /dev/dri:/dev/dri  # For Intel/AMD GPU acceleration (VA-API)
@@ -369,50 +388,6 @@ services:
     #                count: all
     #                capabilities: [gpu]
       
-  gluetun:
-    image: qmcgaw/gluetun:v3
-    container_name: gluetun
-    cap_add:
-      - NET_ADMIN
-    restart: unless-stopped
-    devices:
-      - /dev/net/tun:/dev/net/tun
-    environment:
-      - DNS_UPSTREAM_RESOLVERS=${GLUETUN_DNS_UPSTREAM_RESOLVERS:-gluetun}
-      - VPN_SERVICE_PROVIDER=${VPN_SERVICE_PROVIDER:-mullvad}
-      - VPN_TYPE=${VPN_TYPE:-wireguard}
-      - WIREGUARD_PRIVATE_KEY=${WIREGUARD_KEY}
-      - WIREGUARD_ADDRESSES=${WIREGUARD_ADD}
-      - SERVER_CITIES=${VPN_SERVER_CITIES}
-      - UPDATER_PERIOD=24h
-      - UPDATER_VPN_SERVICE_PROVIDERS=${VPN_SERVICE_PROVIDER:-mullvad}
-      - WIREGUARD_MTU=${WIREGUARD_MTU:-1200}
-      - PUBLICIP_API=${PUBLICIP_API}
-      - PUBLICIP_API_TOKEN=${PUBLICIP_TOKEN}
-      - VPN_PORT_FORWARDING=${VPN_PORT_FORWARDING}
-      - VPN_PORT_FORWARDING_UP_COMMAND=/bin/sh -c 'wget -O- --retry-connrefused --post-data "json={\"listen_port\":{{PORT}},\"current_network_interface\":\"{{VPN_INTERFACE}}\",\"random_port\":false,\"upnp\":false}" http://127.0.0.1:8080/api/v2/app/setPreferences 2>&1'
-      - VPN_PORT_FORWARDING_DOWN_COMMAND=/bin/sh -c 'wget -O- --retry-connrefused --post-data "json={\"listen_port\":0,\"current_network_interface\":\"lo"}" http://127.0.0.1:8080/api/v2/app/setPreferences 2>&1'
-      - UPDATER_PROTONVPN_EMAIL=${UPDATER_PROTONVPN_EMAIL:-}
-      - UPDATER_PROTONVPN_PASSWORD=${UPDATER_PROTONVPN_PASSWORD:-}
-      - OPENVPN_USER=${OPENVPN_USER:-}
-      - OPENVPN_PASSWORD=${OPENVPN_PASSWORD:-}
-    ports:
-      - 2468:2468/tcp # cross-seed
-      - 8080:8080/tcp # qBit
-      - 8694:8694/tcp # qBit
-      - 5757:5757/tcp # kapowarr
-      - 8191:8191/tcp # flaresolverr
-      - 9696:9696/tcp # prowlarr
-      - 7474:7474/tcp # autobrr
-      - 9191:9191 # dispatcharr
-      - 6767:6767 # bazarr
-    networks:
-      - starr
-      - proxy
-      - gluetun_network
-    # IF VPN CANNOT CONNECT, USE BELOW COMMAND TO UPDATE SERVERS.
-    # command: update -enduser -providers ${VPN_SERVICE_PROVIDER:-mullvad}
-
   homarr:
     container_name: homarr
     image: ghcr.io/homarr-labs/homarr:latest
@@ -491,7 +466,7 @@ services:
           api_key: "$READARR_KEY"
      ## qBitorrent
      QBITTORRENT: >
-        - base_url: "http://gluetun:8080"
+        - base_url: "http://qbittorrent:8080"
           username: "$QBIT_USER"
           password: "$QBIT_PASS"
     networks:
